@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>#Nephpearls – Nephrology Search Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Materialize CSS for Material theme -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #e3f2fd;
+            color: #111;
+            font-family: 'Roboto', Arial, sans-serif;
+        }
+        .main-title {
+            margin-top: 1.5rem;
+            font-weight: 500;
+            color: #1976d2;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #444;
+            margin-bottom: 2rem;
+            font-size: 1.2rem;
+        }
+        .search-panel {
+            padding: 1rem 2rem 2rem 2rem;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px #aaa2;
+            max-width: 650px;
+            margin: 1rem auto 2rem auto;
+        }
+        .keyword-row {
+            display: flex;
+            margin-bottom: 0.8rem;
+            gap: 6px;
+        }
+        .keyword-input {
+            flex: 1;
+        }
+        .results-columns {
+            display: flex;
+            gap: 16px;
+            margin: 0 auto;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .result-col {
+            flex: 1 1 320px;
+            min-width: 320px;
+            max-width: 450px;
+            background: #f7fbff;
+            border-radius: 9px;
+            box-shadow: 0 1px 6px #ddd6;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            height: 480px;
+        }
+        .result-col h5 {
+            background: #1976d2;
+            color: #fff;
+            margin: 0;
+            border-radius: 9px 9px 0 0;
+            padding: 0.7rem 1rem;
+            font-size: 1.18rem;
+            font-weight: 500;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .scroll-area {
+            overflow-y: auto;
+            flex: 1;
+            padding: 1rem;
+        }
+        .material-checkbox label {
+            padding-left: 28px;
+            cursor: pointer;
+            font-size: 1.15rem;
+        }
+        @media (max-width: 980px) {
+            .results-columns { flex-direction: column; align-items: center;}
+            .result-col { min-width:240px; max-width:98vw;}
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h2 class="main-title">#Nephpearls</h2>
+        <div class="subtitle">A Nephrology-specific search tool for world-wide kidney knowledge</div>
+        <div class="search-panel z-depth-2">
+            <div id="keywords-area">
+                <div class="keyword-row">
+                    <input type="text" class="keyword-input" placeholder="Enter a nephrology keyword (e.g. Hypertension)" aria-label="Keyword">
+                    <button class="btn-flat blue-text" onclick="addKeyword()" title="Add another keyword" type="button">
+                        <i class="material-icons">add_circle</i>
+                    </button>
+                </div>
+            </div>
+            <div style="margin: 1.5rem 0 1rem 0;">
+                <span style="font-weight:500;font-size:1.12rem;">Filters:</span><br>
+                <label>
+                    <input type="checkbox" id="filter-reviews" checked />
+                    <span>Reviews</span>
+                </label>
+                <label style="margin-left:18px;">
+                    <input type="checkbox" id="filter-all" />
+                    <span>All Papers</span>
+                </label>
+                <label style="margin-left:18px;">
+                    <input type="checkbox" id="filter-social" />
+                    <span>Social (X & Bluesky)</span>
+                </label>
+            </div>
+            <div style="text-align:center">
+                <button class="btn blue" onclick="startSearch()" style="margin-right:18px;">Start Search</button>
+                <button class="btn-flat" onclick="resetForm()">Reset</button>
+            </div>
+        </div>
+        <div id="results" style="max-width:1500px; margin:0 auto;"></div>
+        <div class="subtitle" style="font-size:0.99rem;margin-bottom:1.5rem;">
+            <b>#Nephpearls</b>. Open access, educational only. <br>
+            Powered by PubMed, X (Twitter), and Bluesky public search.
+        </div>
+    </div>
+    <!-- Materialize JS for button icons etc -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // --- Helper functions ---
+        function addKeyword() {
+            const area = document.getElementById('keywords-area');
+            const row = document.createElement('div');
+            row.className = "keyword-row";
+            row.innerHTML = `
+                <input type="text" class="keyword-input" placeholder="Add another keyword" aria-label="Keyword">
+                <button class="btn-flat red-text" onclick="removeKeyword(this)" type="button">
+                    <i class="material-icons">remove_circle</i>
+                </button>
+            `;
+            area.appendChild(row);
+        }
+        function removeKeyword(btn) {
+            btn.parentElement.remove();
+        }
+        function getKeywords() {
+            const kwds = [];
+            document.querySelectorAll('.keyword-input').forEach(e => {
+                if (e.value.trim()) { kwds.push(e.value.trim()); }
+            });
+            return kwds;
+        }
+        function getQueryString(keywords) {
+            // Returns query block, AND-ing all keywords
+            return keywords.map(kw => `(${kw})`).join(' AND ');
+        }
+
+        function startSearch() {
+            const keywords = getKeywords();
+            if (keywords.length === 0) {
+                M.toast({html: "Please enter at least one keyword.", classes: "red"});
+                return;
+            }
+            // What columns to show?
+            const reviews = document.getElementById('filter-reviews').checked;
+            const allPapers = document.getElementById('filter-all').checked;
+            const social = document.getElementById('filter-social').checked;
+
+            if (!(reviews || allPapers || social)) {
+                M.toast({html: "Please select at least one filter.", classes: "red"});
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = ''; // clear
+
+            // Build columns
+            const cols = [];
+            if (reviews) cols.push(renderPubmedCol(keywords, true));
+            if (allPapers) cols.push(renderPubmedCol(keywords, false));
+            if (social) cols.push(renderSocialCol(keywords));
+            // Layout columns
+            const container = document.createElement('div');
+            container.className = "results-columns";
+            cols.forEach(c => container.appendChild(c));
+            resultsDiv.appendChild(container);
+        }
+
+        function resetForm() {
+            document.getElementById('keywords-area').innerHTML = `
+             <div class="keyword-row">
+                <input type="text" class="keyword-input" placeholder="Enter a nephrology keyword (e.g. Hypertension)" aria-label="Keyword">
+                <button class="btn-flat blue-text" onclick="addKeyword()" title="Add another keyword" type="button">
+                    <i class="material-icons">add_circle</i>
+                </button>
+             </div>
+            `;
+            document.getElementById('filter-reviews').checked = true;
+            document.getElementById('filter-all').checked = false;
+            document.getElementById('filter-social').checked = false;
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // --- PubMed Col ---
+        function renderPubmedCol(keywords, reviewsOnly) {
+            const kwquery = getQueryString(keywords);
+
+            // This is the central journal list filter
+            const journalBlock = `("Nat Rev Nephrol"[TA] OR "Kidney Int"[TA] OR "J Am Soc Nephrol"[TA] OR "Am J Kidney Dis"[TA] OR 
+                "Clin J Am Soc Nephrol"[TA] OR "Nephrol Dial Transplant"[TA] OR "Kidney Int Rep"[TA] OR "Am J Nephrol"[TA] OR 
+                "Clin Kidney J"[TA] OR "Perit Dial Int"[TA] OR "Curr Opin Nephrol Hypertens"[TA] OR "Kidney Med"[TA] OR 
+                "Semin Nephrol"[TA] OR "Kidney360"[TA] OR "Adv Kidney Dis Health"[TA])`;
+
+            const journalBlockGen = `("N Engl J Med"[TA] OR "Lancet"[TA] OR "JAMA"[TA] OR "BMJ"[TA] OR "Ann Intern Med"[TA])`;
+            const nephMeSH = `(Nephrology[MeSH Terms] OR Renal Diseases[MeSH Terms] OR Kidney Diseases[MeSH Terms] OR kidney[Title/Abstract] OR renal[Title/Abstract])`;
+            // Build combined query:
+            let mainQuery = `(${kwquery}) AND ((${journalBlock}${reviewsOnly ? ' AND review[Publication Type]' : ''}) OR (${journalBlockGen}${reviewsOnly ? ' AND review[Publication Type]' : ''} AND ${nephMeSH}))`;
+            // console.log(mainQuery);
+
+            const searchURL = `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(mainQuery)}&sort=date`;
+            // Create results column
+            const col = document.createElement('div');
+            col.className = "result-col";
+            col.innerHTML = `
+                <h5>PubMed${reviewsOnly ? " Reviews" : ""}</h5>
+                <div class="scroll-area">
+                    <div style="padding:6px 0 12px 0; font-size:1.08rem;">
+                        <span>${reviewsOnly ? "Latest peer-reviewed reviews" : "All peer-reviewed articles"},<br>top nephrology and general medicine journals.</span>
+                    </div>
+                    <a href="${searchURL}" target="_blank" class="btn blue" style="margin-bottom:10px;width:90%;">Open Results in PubMed</a>
+                    <div style="color:#666; font-size:0.93rem;">
+                        <b>Journals included:</b> Nat Rev Nephrol, KI, JASN, AJKD, CJASN, NDT, KI Rep, Am J Nephrol, Clin Kidney J, Perit Dial Int, CO Nephrol Hypertens, Kidney Med, Semin Nephrol, Kidney360, Adv Kidney Dis Health, NEJM, Lancet, JAMA, BMJ, Ann Intern Med.
+                    </div>
+                </div>
+            `;
+            return col;
+        }
+
+        // --- Social Col ---
+        function renderSocialCol(keywords) {
+            const kwq = keywords.map(encodeURIComponent).join("%20OR%20");
+            const twitterURL = `https://twitter.com/search?q=${kwq}&src=typed_query&f=live`;
+            const blueskyURL = `https://bsky.app/search?q=${kwq}`;
+
+            const col = document.createElement('div');
+            col.className = "result-col";
+            col.innerHTML = `
+                <h5>Social (X & Bluesky)</h5>
+                <div class="scroll-area">
+                    <div style="font-size:1.08rem;padding:6px 0 18px 0;">
+                        <span>Freely available, public posts related to your keywords.</span>
+                    </div>
+                    <a href="${twitterURL}" target="_blank" class="btn" style="background:#161d26;width:90%;margin-bottom:12px;">
+                        <i class="material-icons left" style="color:#55acee">public</i>X (Twitter) Search
+                    </a>
+                    <a href="${blueskyURL}" target="_blank" class="btn blue" style="width:90%;margin-bottom:8px;">
+                        <i class="material-icons left" style="color:#1976d2">public</i>Bluesky Search
+                    </a>
+                    <div style="color:#666;font-size:0.94rem;line-height:1.4;margin-top:10px;">
+                        Tip: You can open either or both. Social search shows the latest discussions on X (Twitter) and Bluesky. No login required to view.
+                    </div>
+                </div>
+            `;
+            return col;
+        }
+    </script>
+    <!-- Material Icons CDN -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</body>
+</html>
