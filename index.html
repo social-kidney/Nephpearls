@@ -112,8 +112,6 @@
                     <span>All Papers</span>
                 </label>
                 <label style="margin-left:18px;">
-                    <input type="checkbox" id="filter-social" />
-                    <span>Social (X & Bluesky)</span>
                 </label>
             </div>
             <div style="text-align:center">
@@ -124,7 +122,7 @@
         <div id="results" style="max-width:1500px; margin:0 auto;"></div>
         <div class="subtitle" style="font-size:0.99rem;margin-bottom:1.5rem;">
             <b>#Nephpearls</b>. Open access, educational only. <br>
-            Powered by PubMed, X (Twitter), and Bluesky public search.
+            Powered by PubMed public search.
         </div>
     </div>
     <!-- Materialize JS for button icons etc -->
@@ -167,9 +165,8 @@
             // What columns to show?
             const reviews = document.getElementById('filter-reviews').checked;
             const allPapers = document.getElementById('filter-all').checked;
-            const social = document.getElementById('filter-social').checked;
 
-            if (!(reviews || allPapers || social)) {
+            if (!(reviews || allPapers)) {
                 M.toast({html: "Please select at least one filter.", classes: "red"});
                 return;
             }
@@ -181,7 +178,6 @@
             const cols = [];
             if (reviews) cols.push(renderPubmedCol(keywords, true));
             if (allPapers) cols.push(renderPubmedCol(keywords, false));
-            if (social) cols.push(renderSocialCol(keywords));
             // Layout columns
             const container = document.createElement('div');
             container.className = "results-columns";
@@ -200,7 +196,6 @@
             `;
             document.getElementById('filter-reviews').checked = true;
             document.getElementById('filter-all').checked = false;
-            document.getElementById('filter-social').checked = false;
             document.getElementById('results').innerHTML = '';
         }
 
@@ -240,9 +235,6 @@
         }
 
         // --- Social Col ---
-        function renderSocialCol(keywords) {
-            const kwq = keywords.map(encodeURIComponent).join("%20OR%20");
-            const twitterURL = `https://twitter.com/search?q=${kwq}&src=typed_query&f=live`;
             const blueskyURL = `https://bsky.app/search?q=${kwq}`;
 
             const col = document.createElement('div');
